@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Duck Heist: Mastermind 4K 🦆</title>
+    <title>Duck Heist: Texture Edition 🦆</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Fredoka:wght@400;700&display=swap');
 
@@ -345,7 +345,7 @@
 
 <script>
 /**
- * DUCK HEIST ENGINE - GITHUB REPO READY
+ * DUCK HEIST ENGINE - OPTIMIZED TEXTURE EDITION
  */
 
 const Game = (function() {
@@ -353,36 +353,39 @@ const Game = (function() {
     const ctx = canvas.getContext('2d', { alpha: false });
     
     const TILE_SIZE = 64;
+    const TEXTURE_SCALE = 4.5; // REQUESTED: 4.5x bigger textures
     const DPR = window.devicePixelRatio || 1;
     let width, height;
 
     // --- Assets ---
-    // Load relative path for GitHub Repo compatibility
     const floorImg = new Image();
     const wallImg = new Image();
     let floorPattern = null;
     let wallPattern = null;
 
-    // Handlers must be defined BEFORE setting src to catch immediate loads
+    // Helper to scale textures before creating patterns
+    function prepareTexture(img, scale) {
+        const offCanvas = document.createElement('canvas');
+        offCanvas.width = img.width * scale;
+        offCanvas.height = img.height * scale;
+        const offCtx = offCanvas.getContext('2d');
+        offCtx.imageSmoothingEnabled = false; // Keep pixel art sharp
+        offCtx.drawImage(img, 0, 0, offCanvas.width, offCanvas.height);
+        return offCtx.createPattern(offCanvas, 'repeat');
+    }
+
     floorImg.onload = () => { 
-        floorPattern = ctx.createPattern(floorImg, 'repeat'); 
-        console.log("Floor texture loaded successfully"); 
+        floorPattern = prepareTexture(floorImg, TEXTURE_SCALE);
+        console.log("Floor texture loaded and scaled"); 
     };
-    floorImg.onerror = () => {
-        console.warn("Floor texture failed to load (check filename). Using color fallback.");
-        floorPattern = null;
-    };
+    floorImg.onerror = () => { console.warn("Floor texture missing. Using fallback."); };
 
     wallImg.onload = () => { 
-        wallPattern = ctx.createPattern(wallImg, 'repeat'); 
-        console.log("Wall texture loaded successfully"); 
+        wallPattern = prepareTexture(wallImg, TEXTURE_SCALE);
+        console.log("Wall texture loaded and scaled"); 
     };
-    wallImg.onerror = () => {
-        console.warn("Wall texture failed to load (check filename). Using color fallback.");
-        wallPattern = null;
-    };
+    wallImg.onerror = () => { console.warn("Wall texture missing. Using fallback."); };
     
-    // Set src triggers loading
     floorImg.src = 'floor.png';
     wallImg.src = 'wall.png';
 
@@ -414,7 +417,6 @@ const Game = (function() {
         canvas.width = width * DPR;
         canvas.height = height * DPR;
         ctx.setTransform(1, 0, 0, 1, 0, 0); 
-        // Essential for keeping pixel art textures sharp when scaled
         ctx.imageSmoothingEnabled = false; 
     }
 
@@ -438,10 +440,9 @@ const Game = (function() {
         return false;
     }
 
-    // Check if point B is visible from point A (Line of Sight)
     function checkLineOfSight(x1, y1, x2, y2) {
         let dist = Math.hypot(x2-x1, y2-y1);
-        let steps = dist / (TILE_SIZE/2); // Check every half tile
+        let steps = dist / (TILE_SIZE/2);
         let dx = (x2-x1)/steps;
         let dy = (y2-y1)/steps;
         let cx = x1, cy = y1;
@@ -470,7 +471,7 @@ const Game = (function() {
         let found = false;
         let iterations = 0;
 
-        while(queue.length > 0 && iterations < 500) {
+        while(queue.length > 0 && iterations < 300) { // Limit iterations for performance
             iterations++;
             let curr = queue.shift();
             
@@ -508,14 +509,14 @@ const Game = (function() {
 
     function getVisibilityPolygon(ox, oy, radius) {
         const points = [];
-        const rays = 120;
+        const rays = 90; // OPTIMIZATION: Reduced from 120 to 90 for better performance
         for(let i=0; i<rays; i++) {
             const angle = (i/rays) * Math.PI * 2;
             let dx = Math.cos(angle);
             let dy = Math.sin(angle);
             let dist = 0;
             let cx=ox, cy=oy;
-            const step = 20; 
+            const step = 25; // OPTIMIZATION: Increased step size slightly
             while(dist < radius) {
                 cx += dx * step;
                 cy += dy * step;
@@ -523,9 +524,10 @@ const Game = (function() {
                 let gx = Math.floor(cx/TILE_SIZE);
                 let gy = Math.floor(cy/TILE_SIZE);
                 if(gx<0 || gx>=map.w || gy<0 || gy>=map.h || map.grid[gy][gx] === 1) {
+                    // Slight refinement
                     cx -= dx * step; cy -= dy * step; dist -= step;
-                    for(let k=0; k<step; k+=4) { 
-                        cx += dx*4; cy += dy*4;
+                    for(let k=0; k<step; k+=5) { 
+                        cx += dx*5; cy += dy*5;
                         gx = Math.floor(cx/TILE_SIZE); gy = Math.floor(cy/TILE_SIZE);
                         if(gx<0 || gx>=map.w || gy<0 || gy>=map.h || map.grid[gy][gx] === 1) break;
                     }
@@ -906,7 +908,6 @@ const Game = (function() {
             entities.push(new Guard(r.cx*TILE_SIZE, r.cy*TILE_SIZE));
         }
 
-        // Distance check for exit to prevent instant teleport
         let bestDist = 0;
         let bestRoom = rooms[rooms.length-1];
         for(let i=1; i<rooms.length; i++) {
@@ -1034,38 +1035,30 @@ const Game = (function() {
         let startX = Math.floor(cam.x/TILE_SIZE), startY = Math.floor(cam.y/TILE_SIZE);
         let endX = startX + Math.ceil(width/TILE_SIZE)+1, endY = startY + Math.ceil(height/TILE_SIZE)+1;
         
-        // Draw floor
-        for(let y=startY; y<endY; y++) {
-            for(let x=startX; x<endX; x++) {
-                if(y>=0 && y<map.h && x>=0 && x<map.w && map.grid[y][x]===0) {
-                    if(floorPattern) {
-                        ctx.fillStyle = floorPattern;
-                        ctx.save();
-                        ctx.translate(x*TILE_SIZE, y*TILE_SIZE);
-                        ctx.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
-                        ctx.restore();
-                    } else {
-                        ctx.fillStyle = (x+y)%2===0 ? '#a4b0be' : '#747d8c'; 
-                        ctx.fillRect(x*TILE_SIZE, y*TILE_SIZE, TILE_SIZE, TILE_SIZE);
-                    }
-                }
-            }
+        // OPTIMIZATION: BATCH DRAWING
+        // Instead of drawing hundreds of 64x64 rects for the floor, draw ONE big rect for the visible area.
+        // Walls will cover it where needed.
+        if(floorPattern) {
+            ctx.fillStyle = floorPattern;
+            ctx.fillRect(Math.max(0, startX * TILE_SIZE), Math.max(0, startY * TILE_SIZE), 
+                         (endX - startX) * TILE_SIZE, (endY - startY) * TILE_SIZE);
+        } else {
+            ctx.fillStyle = '#a4b0be';
+            ctx.fillRect(Math.max(0, startX * TILE_SIZE), Math.max(0, startY * TILE_SIZE), 
+                         (endX - startX) * TILE_SIZE, (endY - startY) * TILE_SIZE);
         }
-        
-        // Walls
+
+        // Draw Walls on top
+        // OPTIMIZATION: Removed ctx.save() and ctx.restore() from inside the loop
         for(let y=startY; y<endY; y++) {
             for(let x=startX; x<endX; x++) {
                 if(y>=0 && y<map.h && x>=0 && x<map.w && map.grid[y][x]===1) {
                     let wx = x*TILE_SIZE, wy = y*TILE_SIZE;
                     if(wallPattern) {
-                        ctx.save();
-                        ctx.translate(wx, wy);
                         ctx.fillStyle = wallPattern;
-                        ctx.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
-                        // Top darken
+                        ctx.fillRect(wx, wy, TILE_SIZE, TILE_SIZE);
                         ctx.fillStyle = 'rgba(0,0,0,0.3)';
-                        ctx.fillRect(0, 0, TILE_SIZE, 20);
-                        ctx.restore();
+                        ctx.fillRect(wx, wy, TILE_SIZE, 20); // Top shade
                     } else {
                         ctx.fillStyle = '#2f3542';
                         ctx.fillRect(wx, wy, TILE_SIZE, TILE_SIZE);
@@ -1115,7 +1108,6 @@ const Game = (function() {
                 if(e instanceof Guard) e.draw(ctx);
             }
             
-            // Loot is safehouse only
             if(e.type === 'LOOT') {
                  ctx.fillStyle = '#ffa502';
                  for(let i=0; i<Math.min(e.count, 50); i++) {
